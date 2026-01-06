@@ -1,6 +1,7 @@
 {
   "project_info": {
     "project_number": "305246590407",
+    "firebase_url": "https://smartcity-35df0-default-rtdb.firebaseio.com",
     "project_id": "smartcity-35df0",
     "storage_bucket": "smartcity-35df0.firebasestorage.app"
   },
@@ -13,6 +14,14 @@
         }
       },
       "oauth_client": [
+        {
+          "client_id": "305246590407-e95nv7bdfu1ii92dg4aaveq71p5g977b.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "tn.esprit.sansa",
+            "certificate_hash": "ebcc26f93dd0a0537178c0f596218ebb90c83b74"
+          }
+        },
         {
           "client_id": "305246590407-j4i32oni7vqc08m6g67gnhregkfh06j5.apps.googleusercontent.com",
           "client_type": 3
