@@ -45,11 +45,18 @@ android {
     androidResources {
         noCompress += "tflite"
     }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
 }
 
 dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.core.splashscreen)
 
     // === MISE À JOUR OSMDROID ===
     implementation("org.osmdroid:osmdroid-android:6.1.20")

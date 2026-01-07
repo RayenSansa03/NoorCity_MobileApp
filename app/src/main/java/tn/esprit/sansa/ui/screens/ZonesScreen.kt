@@ -63,32 +63,24 @@ private val NoorIndigo = Color(0xFF6366F1)
 fun ZonesScreen(
     viewModel: ZonesViewModel = viewModel(),
     role: UserRole? = UserRole.CITIZEN,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onNavigateToAddZone: () -> Unit = {},
+    onNavigateToEditZone: (String) -> Unit = {}
 ) {
     val zones by viewModel.zones.collectAsState()
     val zoneWeather by viewModel.zoneWeather.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
-    var showAddZone by remember { mutableStateOf(false) }
 
-    if (showAddZone) {
-        AddZoneScreen(
-            onAddSuccess = { 
-                showAddZone = false
-                viewModel.refresh()
-            },
-            onBackPressed = { showAddZone = false }
-        )
-    } else {
-        ZonesMainScreen(
-            zones = zones,
-            zoneWeather = zoneWeather,
-            isLoading = isLoading,
-            modifier = modifier,
-            onNavigateToAddZone = { showAddZone = true },
-            onDeleteZone = { zone -> viewModel.deleteZone(zone.id) { viewModel.refresh() } },
-            role = role
-        )
-    }
+    ZonesMainScreen(
+        zones = zones,
+        zoneWeather = zoneWeather,
+        isLoading = isLoading,
+        modifier = modifier,
+        onNavigateToAddZone = onNavigateToAddZone,
+        onNavigateToEditZone = onNavigateToEditZone,
+        onDeleteZone = { zone -> viewModel.deleteZone(zone.id) { viewModel.refresh() } },
+        role = role
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -99,6 +91,7 @@ private fun ZonesMainScreen(
     isLoading: Boolean,
     modifier: Modifier = Modifier,
     onNavigateToAddZone: () -> Unit,
+    onNavigateToEditZone: (String) -> Unit,
     onDeleteZone: (Zone) -> Unit,
     role: UserRole?
 ) {
@@ -244,9 +237,14 @@ private fun ZonesMainScreen(
                         StaggeredItem(index = index) {
                             SwipeActionsContainer(
                                 item = zone,
-                                onDelete = { onDeleteZone(zone) }
+                                onDelete = { onDeleteZone(zone) },
+                                onEdit = if (role == UserRole.ADMIN) { { z -> onNavigateToEditZone(z.id) } } else null
                             ) { item ->
-                                ZoneCard(zone = item, weatherInfo = zoneWeather[item.id])
+                                ZoneCard(
+                                    zone = item,
+                                    weatherInfo = zoneWeather[item.id],
+                                    onEdit = if (role == UserRole.ADMIN) { { onNavigateToEditZone(item.id) } } else null
+                                )
                             }
                         }
 
@@ -526,7 +524,7 @@ private fun ZoneStatusFilters(
 }
 
 @Composable
-private fun ZoneCard(zone: Zone, weatherInfo: ZoneWeatherInfo? = null) {
+private fun ZoneCard(zone: Zone, weatherInfo: ZoneWeatherInfo? = null, onEdit: (() -> Unit)? = null) {
     var expanded by remember { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
@@ -709,7 +707,7 @@ private fun ZoneCard(zone: Zone, weatherInfo: ZoneWeatherInfo? = null) {
 
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         OutlinedButton(
-                            onClick = { /* TODO */ },
+                            onClick = { onEdit?.invoke() },
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(Icons.Default.Edit, null, modifier = Modifier.size(18.dp))

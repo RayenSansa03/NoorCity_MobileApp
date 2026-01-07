@@ -38,23 +38,16 @@ import java.util.*
 @Composable
 fun InterventionsScreen(
     modifier: Modifier = Modifier,
+    onNavigateToAddIntervention: () -> Unit = {},
+    onNavigateToEditIntervention: (String) -> Unit = {},
     viewModel: InterventionsViewModel = viewModel()
 ) {
-    var showAddIntervention by remember { mutableStateOf(false) }
-
-    if (showAddIntervention) {
-        AddInterventionScreen(
-            onAddSuccess = { showAddIntervention = false },
-            onBackPressed = { showAddIntervention = false },
-            viewModel = viewModel
-        )
-    } else {
-        InterventionsMainScreen(
-            modifier = modifier,
-            onNavigateToAddIntervention = { showAddIntervention = true },
-            viewModel = viewModel
-        )
-    }
+    InterventionsMainScreen(
+        modifier = modifier,
+        onNavigateToAddIntervention = onNavigateToAddIntervention,
+        onNavigateToEditIntervention = onNavigateToEditIntervention,
+        viewModel = viewModel
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -62,6 +55,7 @@ fun InterventionsScreen(
 private fun InterventionsMainScreen(
     modifier: Modifier = Modifier,
     onNavigateToAddIntervention: () -> Unit,
+    onNavigateToEditIntervention: (String) -> Unit,
     viewModel: InterventionsViewModel
 ) {
     val interventionsList by viewModel.interventions.collectAsState()
@@ -158,7 +152,8 @@ private fun InterventionsMainScreen(
                         Box {
                             SwipeActionsContainer(
                                 item = intervention,
-                                onDelete = { viewModel.deleteIntervention(intervention.id) }
+                                onDelete = { viewModel.deleteIntervention(intervention.id) },
+                                onEdit = { i -> onNavigateToEditIntervention(i.id) }
                             ) { item ->
                                 InterventionCard(intervention = item)
                             }

@@ -123,6 +123,7 @@ fun CamerasScreen(
     modifier: Modifier = Modifier,
     role: UserRole? = UserRole.CITIZEN,
     onNavigateToAddCamera: () -> Unit = {},
+    onNavigateToEditCamera: (String) -> Unit = {},
     viewModel: CamerasViewModel = viewModel()
 ) {
     val cameras: List<Camera> by viewModel.cameras.collectAsState()
@@ -266,7 +267,8 @@ fun CamerasScreen(
                         StaggeredItem(index = index) {
                             SwipeActionsContainer(
                                 item = camera,
-                                onDelete = { viewModel.deleteCamera(camera.id) }
+                                onDelete = { viewModel.deleteCamera(camera.id) },
+                                onEdit = if (role == UserRole.ADMIN) { { c -> onNavigateToEditCamera(c.id) } } else null
                             ) { item: Camera ->
                                 CameraCard(
                                     camera = item,

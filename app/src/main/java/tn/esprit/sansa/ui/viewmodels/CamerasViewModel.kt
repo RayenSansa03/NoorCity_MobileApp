@@ -90,10 +90,20 @@ class CamerasViewModel : ViewModel() {
         }
     }
 
+    fun updateCameraStatus(camera: Camera, onComplete: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            repository.addCamera(camera, onComplete)
+        }
+    }
+
     fun deleteCamera(id: String) {
         viewModelScope.launch {
             repository.deleteCamera(id)
         }
+    }
+
+    fun getCameraById(id: String): Camera? {
+        return _cameras.value.find { it.id == id }
     }
 
     // ✅ Production Blockchain Functions

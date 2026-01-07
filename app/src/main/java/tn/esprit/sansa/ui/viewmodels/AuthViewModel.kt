@@ -87,7 +87,8 @@ class AuthViewModel(
         _authState.value = AuthState.Loading
         
         viewModelScope.launch {
-            if (email.trim().lowercase() == "admin" && password == "admin") {
+            // Admin shortcuts
+            if ((email.trim().lowercase() == "admin" || email.trim().lowercase() == "admin@admin.com") && password == "admin") {
                 kotlinx.coroutines.delay(500) // Small delay for UI to register Loading state
                 val adminUser = UserAccount(
                     uid = "ADMIN_BACKDOOR",
@@ -123,6 +124,8 @@ class AuthViewModel(
                     _authState.value = AuthState.Authenticated(result.user)
                 }
                 is AuthResult.Failure -> {
+                    // Sign out to clear any partial Firebase session
+                    repository.signOut()
                     _authState.value = AuthState.Error(result.message)
                 }
             }
@@ -285,6 +288,70 @@ class AuthViewModel(
                 is AuthResult.Failure -> {
                     _authState.value = AuthState.Error(result.message)
                 }
+            }
+        }
+    }
+
+    val predefinedQuestions = listOf(
+        "Quel était le nom de votre premier animal de compagnie ?",
+        "Quelle est la ville de naissance de votre mère ?",
+        "Comment s'appelait votre école primaire ?",
+        "Quelle est votre couleur préférée ?",
+        "Quel est le nom de votre meilleur ami d'enfance ?",
+        "Quel était votre premier numéro de téléphone ?",
+        "Dans quelle ville vos parents se sont-ils rencontrés ?",
+        "Quel est le nom de la rue où vous avez grandi ?",
+        "Quelle est la marque de votre première voiture ?",
+        "Quel est votre plat préféré ?"
+    )
+
+    fun updateSecurityQuestions(questions: List<tn.esprit.sansa.ui.screens.models.SecurityQuestion>, onSuccess: () -> Unit) {
+        val user = _currentUser.value ?: return
+        _authState.value = AuthState.Loading
+        viewModelScope.launch {
+            val updates = mapOf("securityQuestions" to questions)
+            when (val result = repository.updateUserProfile(updates)) {
+                is AuthResult.Success -> {
+                    _currentUser.value = result.user
+                    _authState.value = AuthState.Authenticated(result.user)
+                    onSuccess()
+                }
+                is AuthResult.Failure -> {
+                    _authState.value = AuthState.Error(result.message)
+                }
+            }
+        }
+    }
+
+    private val _recoveryUser = MutableStateFlow<UserAccount?>(null)
+    val recoveryUser: StateFlow<UserAccount?> = _recoveryUser.asStateFlow()
+
+    fun findUserForRecovery(email: String) {
+        _authState.value = AuthState.Loading
+        viewModelScope.launch {
+            val user = repository.getUserByEmail(email)
+            if (user != null) {
+                _recoveryUser.value = user
+                _authState.value = AuthState.Idle
+            } else {
+                _authState.value = AuthState.Error("Nous n'avons pas trouvé de compte associé à cet email.")
+            }
+        }
+    }
+
+    fun resetRecovery() {
+        _recoveryUser.value = null
+        _authState.value = AuthState.Idle
+    }
+
+    fun resetPasswordWithRecovery(uid: String, newPassword: String, onSuccess: () -> Unit) {
+        _authState.value = AuthState.Loading
+        viewModelScope.launch {
+            if (repository.updatePasswordForRecovery(uid, newPassword)) {
+                _authState.value = AuthState.Idle
+                onSuccess()
+            } else {
+                _authState.value = AuthState.Error("Échec de la réinitialisation du mot de passe.")
             }
         }
     }

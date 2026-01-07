@@ -12,9 +12,11 @@ import tn.esprit.sansa.ui.viewmodels.SettingsViewModel
 import tn.esprit.sansa.ui.utils.SansaLocalization
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.stripe.android.PaymentConfiguration
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         
         // Initialisation de Stripe avec la clé fournie par l'utilisateur

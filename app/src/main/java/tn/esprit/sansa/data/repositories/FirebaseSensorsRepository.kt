@@ -55,15 +55,21 @@ class FirebaseSensorsRepository {
         awaitClose { database.removeEventListener(listener) }
     }
 
-    fun addSensor(sensor: Sensor) {
+    fun addSensor(sensor: Sensor, onComplete: (Boolean) -> Unit = {}) {
         val sensorMap = mapOf(
             "type" to sensor.type.name,
             "value" to sensor.currentValue,
             "status" to sensor.status.name,
             "battery" to sensor.batteryLevel,
-            "streetlightName" to sensor.streetlightName
+            "streetlightName" to sensor.streetlightName,
+            "humidity" to sensor.humidity,
+            "heatIndex" to sensor.heatIndex,
+            "riskLevel" to sensor.riskLevel
         )
         database.child(sensor.id).setValue(sensorMap)
+            .addOnCompleteListener { task ->
+                onComplete(task.isSuccessful)
+            }
     }
 
     fun deleteSensor(id: String) {

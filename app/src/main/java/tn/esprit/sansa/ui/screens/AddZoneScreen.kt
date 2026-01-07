@@ -41,11 +41,15 @@ private val NoorIndigo = Color(0xFF6366F1)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddZoneScreen(
+    editingZoneId: String? = null,
     viewModel: ZonesViewModel = viewModel(),
     onAddSuccess: () -> Unit = {},
     onBackPressed: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val isEditMode = editingZoneId != null
+    var initialZone by remember { mutableStateOf<Zone?>(null) }
+    
     var zoneId by remember { mutableStateOf("") }
     var zoneName by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
@@ -64,16 +68,38 @@ fun AddZoneScreen(
     val geocodingResults by viewModel.geocodingResults.collectAsState()
     val scope = rememberCoroutineScope()
 
-    // Auto-generate ID on screen load
-    LaunchedEffect(Unit) {
-        zoneId = viewModel.generateNextZoneId()
+    // Auto-generate ID on screen load OR load existing data
+    LaunchedEffect(editingZoneId) {
+        if (isEditMode) {
+            val zone = viewModel.getZoneById(editingZoneId!!)
+            if (zone != null && initialZone == null) {
+                initialZone = zone
+                zoneId = zone.id
+                zoneName = zone.name
+                description = zone.description
+                zoneType = zone.type
+                status = zone.status
+                area = zone.area.toString()
+                population = zone.population.toString()
+                coordinator = zone.coordinator
+                latitude = zone.latitude
+                longitude = zone.longitude
+            }
+        } else {
+            if (zoneId.isEmpty()) {
+                zoneId = viewModel.generateNextZoneId()
+            }
+        }
     }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            AddZoneTopBar(onBackPressed = onBackPressed)
+            AddZoneTopBar(
+                title = if (isEditMode) "Modifier la zone" else "Nouvelle zone",
+                onBackPressed = onBackPressed
+            )
         }
     ) { innerPadding ->
         LazyColumn(
@@ -249,16 +275,20 @@ fun AddZoneScreen(
                             longitude = longitude,
                             associatedStreetlights = streetlightIds.split(",").map { it.trim() }.filter { it.isNotEmpty() }
                         )
-                        viewModel.addZone(zone) { onAddSuccess() }
+                        if (isEditMode) {
+                            viewModel.updateZone(zone) { onAddSuccess() }
+                        } else {
+                            viewModel.addZone(zone) { onAddSuccess() }
+                        }
                     },
                     modifier = Modifier.fillMaxWidth().height(60.dp),
                     enabled = zoneId.isNotBlank() && zoneName.isNotBlank(),
                     shape = RoundedCornerShape(30.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = NoorBlue)
                 ) {
-                    Icon(Icons.Default.Check, null)
+                    Icon(if (isEditMode) Icons.Default.Update else Icons.Default.Check, null)
                     Spacer(Modifier.width(12.dp))
-                    Text("Créer la zone", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text(if (isEditMode) "Enregistrer" else "Créer la zone", fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 }
             }
             
@@ -320,7 +350,10 @@ fun ZonePreviewMap(lat: Double, lng: Double, name: String, color: Color = NoorBl
 }
 
 @Composable
-private fun AddZoneTopBar(onBackPressed: () -> Unit) {
+private fun AddZoneTopBar(
+    title: String = "Nouvelle zone",
+    onBackPressed: () -> Unit
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -337,7 +370,7 @@ private fun AddZoneTopBar(onBackPressed: () -> Unit) {
             }
             Spacer(Modifier.width(16.dp))
             Column {
-                Text("Nouvelle zone", color = Color.White.copy(0.9f), fontSize = 16.sp)
+                Text(title, color = Color.White.copy(0.9f), fontSize = 16.sp)
                 Text("Configuration urbaine", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Black)
             }
         }

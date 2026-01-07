@@ -64,6 +64,7 @@ fun SensorsScreen(
     modifier: Modifier = Modifier,
     role: UserRole? = UserRole.CITIZEN,
     onNavigateToAddSensor: () -> Unit = {},
+    onNavigateToEditSensor: (String) -> Unit = {},
     viewModel: SensorsViewModel = viewModel()
 ) {
     val sensors by viewModel.sensors.collectAsState()
@@ -184,9 +185,13 @@ fun SensorsScreen(
                         Box {
                             SwipeActionsContainer(
                                 item = sensor,
-                                onDelete = { viewModel.deleteSensor(sensor.id) }
+                                onDelete = { viewModel.deleteSensor(sensor.id) },
+                                onEdit = if (role == UserRole.ADMIN) { { s -> onNavigateToEditSensor(s.id) } } else null
                             ) { item ->
-                                SensorCard(sensor = item)
+                                SensorCard(
+                                    sensor = item,
+                                    onEdit = if (role == UserRole.ADMIN) { { onNavigateToEditSensor(item.id) } } else null
+                                )
                             }
 
                             if (index == 0 && showTutorial) {
@@ -393,7 +398,7 @@ private fun TypeFilters(
 }
 
 @Composable
-private fun SensorCard(sensor: Sensor) {
+private fun SensorCard(sensor: Sensor, onEdit: (() -> Unit)? = null) {
     var expanded by remember { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
@@ -598,12 +603,12 @@ private fun SensorCard(sensor: Sensor) {
 
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         OutlinedButton(
-                            onClick = { /* TODO */ },
+                            onClick = { onEdit?.invoke() },
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Calibrer", fontSize = 13.sp)
+                            Text("Modifier", fontSize = 13.sp)
                         }
                         Button(
                             onClick = { /* TODO */ },

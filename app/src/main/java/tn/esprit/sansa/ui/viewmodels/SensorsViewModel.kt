@@ -36,9 +36,19 @@ class SensorsViewModel : ViewModel() {
         }
     }
 
-    fun addSensor(sensor: Sensor) {
+    fun getSensorById(id: String): Sensor? {
+        return _sensors.value.find { it.id == id }
+    }
+
+    fun addSensor(sensor: Sensor, onComplete: (Boolean) -> Unit = {}) {
         viewModelScope.launch {
-            repository.addSensor(sensor)
+            repository.addSensor(sensor, onComplete)
+        }
+    }
+
+    fun updateSensor(sensor: Sensor, onComplete: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            repository.addSensor(sensor, onComplete)
         }
     }
 

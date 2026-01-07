@@ -46,6 +46,18 @@ class LightingProgramsViewModel : ViewModel() {
         }
     }
 
+    fun getProgramById(id: String): LightingProgram? {
+        return _programs.value.find { it.id == id }
+    }
+
+    fun updateProgram(program: LightingProgram, onComplete: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            lightingRepository.addProgram(program) { success, _ ->
+                onComplete(success)
+            }
+        }
+    }
+
     fun addProgram(program: LightingProgram, onComplete: (Boolean) -> Unit) {
         viewModelScope.launch {
             lightingRepository.addProgram(program) { success, id ->

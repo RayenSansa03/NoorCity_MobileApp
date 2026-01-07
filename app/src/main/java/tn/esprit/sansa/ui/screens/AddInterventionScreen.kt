@@ -38,10 +38,14 @@ import androidx.compose.ui.zIndex
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddInterventionScreen(
+    editingInterventionId: String? = null,
     onAddSuccess: () -> Unit = {},
     onBackPressed: () -> Unit = {},
     viewModel: InterventionsViewModel = viewModel()
 ) {
+    val isEditMode = editingInterventionId != null
+    var initialIntervention by remember { mutableStateOf<Intervention?>(null) }
+    
     val context = LocalContext.current
     val streetlightsViewModel: StreetlightsViewModel = viewModel()
     val authViewModel: AuthViewModel = viewModel()
@@ -60,6 +64,23 @@ fun AddInterventionScreen(
     var isSubmitting by remember { mutableStateOf(false) }
     var showScanner by remember { mutableStateOf(false) }
 
+    LaunchedEffect(editingInterventionId) {
+        if (isEditMode) {
+            val intervention = viewModel.getInterventionById(editingInterventionId!!)
+            if (intervention != null && initialIntervention == null) {
+                initialIntervention = intervention
+                location = intervention.location
+                streetlightId = intervention.streetlightId
+                description = intervention.description
+                technicianName = intervention.technicianName
+                assignedBy = intervention.assignedBy
+                type = intervention.type
+                priority = InterventionPriority.entries.find { it.displayName == intervention.priority } ?: InterventionPriority.MEDIUM
+                estimatedDuration = intervention.estimatedDuration.toString()
+            }
+        }
+    }
+
     val descriptionSuggestions = remember(type) {
         when (type) {
             InterventionType.REPAIR -> listOf("Ballast défectueux", "Câblage endommagé", "Changement d'ampoule", "Support de fixation")
@@ -75,7 +96,10 @@ fun AddInterventionScreen(
         modifier = Modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            AddInterventionTopBar(onBackPressed = onBackPressed)
+            AddInterventionTopBar(
+                title = if (isEditMode) "Modifier Travaux" else "Nouveaux Travaux",
+                onBackPressed = onBackPressed
+            )
         }
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize()) {
@@ -213,24 +237,40 @@ fun AddInterventionScreen(
                     Button(
                         onClick = {
                             isSubmitting = true
-                            val intervention = Intervention(
-                                streetlightId = streetlightId,
-                                technicianName = technicianName,
-                                type = type,
-                                location = location,
-                                description = description,
-                                estimatedDuration = estimatedDuration.toIntOrNull() ?: 60,
-                                priority = priority.displayName,
-                                assignedBy = assignedBy,
-                                status = InterventionStatus.SCHEDULED
-                            )
-                            viewModel.addIntervention(intervention) { success ->
+                            val interventionToSave = if (isEditMode) {
+                                initialIntervention!!.copy(
+                                    streetlightId = streetlightId,
+                                    technicianName = technicianName,
+                                    type = type,
+                                    location = location,
+                                    description = description,
+                                    estimatedDuration = estimatedDuration.toIntOrNull() ?: 60,
+                                    priority = priority.displayName,
+                                    assignedBy = assignedBy
+                                )
+                            } else {
+                                Intervention(
+                                    streetlightId = streetlightId,
+                                    technicianName = technicianName,
+                                    type = type,
+                                    location = location,
+                                    description = description,
+                                    estimatedDuration = estimatedDuration.toIntOrNull() ?: 60,
+                                    priority = priority.displayName,
+                                    assignedBy = assignedBy,
+                                    status = InterventionStatus.SCHEDULED
+                                )
+                            }
+                            
+                            val action: (Intervention, (Boolean) -> Unit) -> Unit = if (isEditMode) viewModel::updateIntervention else viewModel::addIntervention
+                            
+                            action(interventionToSave) { success ->
                                 isSubmitting = false
                                 if (success) {
-                                    Toast.makeText(context, "Intervention planifiée !", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, if (isEditMode) "Intervention mise à jour !" else "Intervention planifiée !", Toast.LENGTH_SHORT).show()
                                     onAddSuccess()
                                 } else {
-                                    Toast.makeText(context, "Erreur de planification", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "Erreur d'enregistrement", Toast.LENGTH_SHORT).show()
                                 }
                             }
                         },
@@ -245,9 +285,9 @@ fun AddInterventionScreen(
                         if (isSubmitting) {
                             CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                         } else {
-                            Icon(Icons.Default.EventAvailable, null)
+                            Icon(if (isEditMode) Icons.Default.Save else Icons.Default.EventAvailable, null)
                             Spacer(Modifier.width(12.dp))
-                            Text("Planifier l'intervention", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                            Text(if (isEditMode) "Enregistrer les modifications" else "Planifier l'intervention", fontSize = 18.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -312,7 +352,10 @@ fun AddInterventionScreen(
 }
 
 @Composable
-private fun AddInterventionTopBar(onBackPressed: () -> Unit) {
+private fun AddInterventionTopBar(
+    title: String = "Nouveaux Travaux",
+    onBackPressed: () -> Unit
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -334,7 +377,7 @@ private fun AddInterventionTopBar(onBackPressed: () -> Unit) {
             Spacer(Modifier.width(16.dp))
             Column {
                 Text("Planification", color = Color.White.copy(0.85f), fontSize = 14.sp)
-                Text("Nouveaux Travaux", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black)
+                Text(title, color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black)
             }
         }
     }

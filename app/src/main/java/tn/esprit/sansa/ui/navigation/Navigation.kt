@@ -67,6 +67,11 @@ sealed class Screen(
     object AddSensor          : Screen("add_sensor", "", Icons.Default.AddCircle)
 
     object EditStreetlight    : Screen("edit_streetlight/{streetlightId}", "Modifier Lampadaire", Icons.Default.Edit)
+    object EditCamera         : Screen("edit_camera/{cameraId}", "Modifier Caméra", Icons.Default.Edit)
+    object EditZone           : Screen("edit_zone/{zoneId}", "Modifier Zone", Icons.Default.Edit)
+    object EditSensor         : Screen("edit_sensor/{sensorId}", "Modifier Capteur", Icons.Default.Edit)
+    object EditIntervention    : Screen("edit_intervention/{interventionId}", "Modifier Intervention", Icons.Default.Edit)
+    object EditLightingProgram : Screen("edit_lighting_program/{programId}", "Modifier Programme", Icons.Default.Edit)
 
     object Home    : Screen("home", "Accueil", Icons.Default.Home)
     object History : Screen("history", "Historique", Icons.Default.History)
@@ -78,6 +83,7 @@ sealed class Screen(
 
     object EditProfile      : Screen("edit_profile", "Modifier Profil", Icons.Default.Edit)
     object ChangePassword   : Screen("change_password", "Changer MDP", Icons.Default.LockReset)
+    object SetSecurityQuestions : Screen("set_security_questions", "Questions de sécurité", Icons.Default.Quiz)
 
     // Auth Screens
     object Login             : Screen("login", "Connexion", Icons.Default.Login)
@@ -443,6 +449,9 @@ fun AppNavigationWithModernBar(
                     onNavigateToAddCamera = {
                         navController.navigate(Screen.AddCamera.route)
                     },
+                    onNavigateToEditCamera = { id ->
+                        navController.navigate("edit_camera/$id")
+                    },
                     viewModel = camerasViewModel,
                     role = currentUser?.role
                 )
@@ -464,9 +473,18 @@ fun AppNavigationWithModernBar(
             }
 
             composable(Screen.Zones.route) { 
-                ZonesScreen(role = currentUser?.role) 
+                ZonesScreen(
+                    role = currentUser?.role,
+                    onNavigateToAddZone = { navController.navigate(Screen.AddZone.route) },
+                    onNavigateToEditZone = { id -> navController.navigate("edit_zone/$id") }
+                ) 
             }
-            composable(Screen.Interventions.route) { InterventionsScreen() }
+            composable(Screen.Interventions.route) { 
+                InterventionsScreen(
+                    onNavigateToAddIntervention = { navController.navigate(Screen.AddIntervention.route) },
+                    onNavigateToEditIntervention = { id -> navController.navigate("edit_intervention/$id") }
+                ) 
+            }
             composable(Screen.CulturalEvents.route) { 
                 CulturalEventsScreen(
                     role = currentUser?.role,
@@ -482,6 +500,9 @@ fun AppNavigationWithModernBar(
                     role = currentUser?.role,
                     onNavigateToAddProgram = {
                         navController.navigate(Screen.AddLightingProgram.route)
+                    },
+                    onNavigateToEditProgram = { id ->
+                        navController.navigate("edit_lighting_program/$id")
                     }
                 )
             }
@@ -492,12 +513,28 @@ fun AppNavigationWithModernBar(
                     onNavigateToAddSensor = {
                         navController.navigate(Screen.AddSensor.route)
                     },
+                    onNavigateToEditSensor = { id ->
+                        navController.navigate("edit_sensor/$id")
+                    },
                     viewModel = sensorsViewModel
                 )
             }
 
             composable(Screen.AddCamera.route) {
                 AddCameraScreen(
+                    onAddSuccess = { navController.popBackStack() },
+                    modifier = Modifier.fillMaxSize(),
+                    viewModel = camerasViewModel
+                )
+            }
+
+            composable(
+                route = Screen.EditCamera.route,
+                arguments = listOf(androidx.navigation.navArgument("cameraId") { type = androidx.navigation.NavType.StringType })
+            ) { backStackEntry ->
+                val cameraId = backStackEntry.arguments?.getString("cameraId")
+                AddCameraScreen(
+                    editingCameraId = cameraId,
                     onAddSuccess = { navController.popBackStack() },
                     modifier = Modifier.fillMaxSize(),
                     viewModel = camerasViewModel
@@ -524,6 +561,19 @@ fun AppNavigationWithModernBar(
                 )
             }
 
+            composable(
+                route = Screen.EditLightingProgram.route,
+                arguments = listOf(androidx.navigation.navArgument("programId") { type = androidx.navigation.NavType.StringType })
+            ) { backStackEntry ->
+                val programId = backStackEntry.arguments?.getString("programId")
+                AddLightingProgramScreen(
+                    editingProgramId = programId,
+                    onAddSuccess = { navController.popBackStack() },
+                    modifier = Modifier.fillMaxSize(),
+                    culturalEventsViewModel = culturalEventsViewModel
+                )
+            }
+
             composable(Screen.AddStreetlight.route) {
                 AddStreetlightScreen(
                     onAddSuccess = { navController.popBackStack() },
@@ -545,7 +595,22 @@ fun AppNavigationWithModernBar(
                 )
             }
             composable(Screen.AddIntervention.route) {
-                Text("Ajout intervention - À implémenter", modifier = Modifier.fillMaxSize().padding(16.dp))
+                AddInterventionScreen(
+                    onAddSuccess = { navController.popBackStack() },
+                    onBackPressed = { navController.popBackStack() }
+                )
+            }
+
+            composable(
+                route = Screen.EditIntervention.route,
+                arguments = listOf(androidx.navigation.navArgument("interventionId") { type = androidx.navigation.NavType.StringType })
+            ) { backStackEntry ->
+                val interventionId = backStackEntry.arguments?.getString("interventionId")
+                AddInterventionScreen(
+                    editingInterventionId = interventionId,
+                    onAddSuccess = { navController.popBackStack() },
+                    onBackPressed = { navController.popBackStack() }
+                )
             }
             composable(Screen.AddCulturalEvent.route) {
                 AddCulturalEventScreen(
@@ -556,10 +621,37 @@ fun AppNavigationWithModernBar(
                 )
             }
             composable(Screen.AddZone.route) {
-                Text("Ajout zone - À implémenter", modifier = Modifier.fillMaxSize().padding(16.dp))
+                AddZoneScreen(
+                    onAddSuccess = { navController.popBackStack() },
+                    onBackPressed = { navController.popBackStack() }
+                )
+            }
+
+            composable(
+                route = Screen.EditZone.route,
+                arguments = listOf(androidx.navigation.navArgument("zoneId") { type = androidx.navigation.NavType.StringType })
+            ) { backStackEntry ->
+                val zoneId = backStackEntry.arguments?.getString("zoneId")
+                AddZoneScreen(
+                    editingZoneId = zoneId,
+                    onAddSuccess = { navController.popBackStack() },
+                    onBackPressed = { navController.popBackStack() }
+                )
             }
             composable(Screen.AddSensor.route) {
                 AddSensorScreen(
+                    onBack = { navController.popBackStack() },
+                    viewModel = sensorsViewModel
+                )
+            }
+
+            composable(
+                route = Screen.EditSensor.route,
+                arguments = listOf(androidx.navigation.navArgument("sensorId") { type = androidx.navigation.NavType.StringType })
+            ) { backStackEntry ->
+                val sensorId = backStackEntry.arguments?.getString("sensorId")
+                AddSensorScreen(
+                    editingSensorId = sensorId,
                     onBack = { navController.popBackStack() },
                     viewModel = sensorsViewModel
                 )
@@ -610,6 +702,7 @@ fun AppNavigationWithModernBar(
                     settingsViewModel = settingsViewModel,
                     adminDashboardViewModel = adminDashboardViewModel,
                     role = currentUser?.role,
+                    userName = currentUser?.name,
                     onNavigate = { route -> navController.navigate(route) }
                 ) 
             }
@@ -649,6 +742,7 @@ fun AppNavigationWithModernBar(
                 EditProfileScreen(
                     onBack = { navController.popBackStack() },
                     onChangePassword = { navController.navigate(Screen.ChangePassword.route) },
+                    onSetSecurityQuestions = { navController.navigate(Screen.SetSecurityQuestions.route) },
                     onSuccess = { navController.popBackStack() },
                     viewModel = authViewModel
                 )
@@ -656,6 +750,13 @@ fun AppNavigationWithModernBar(
             
             composable(Screen.ChangePassword.route) {
                 ChangePasswordScreen(
+                    onBack = { navController.popBackStack() },
+                    onSuccess = { navController.popBackStack() },
+                    viewModel = authViewModel
+                )
+            }
+            composable(Screen.SetSecurityQuestions.route) {
+                SetSecurityQuestionsScreen(
                     onBack = { navController.popBackStack() },
                     onSuccess = { navController.popBackStack() },
                     viewModel = authViewModel

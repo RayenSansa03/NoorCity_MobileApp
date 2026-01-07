@@ -140,6 +140,10 @@ class CulturalEventsViewModel : ViewModel() {
         }
     }
 
+    fun getAllTechnicians(): List<Technician> {
+        return _realTechnicians.value.ifEmpty { mockTechnicians }
+    }
+
     fun confirmLightingProgram(programId: String) {
         val program = _lightingPrograms.value.find { it.id == programId } ?: return
         val updatedProgram = program.copy(

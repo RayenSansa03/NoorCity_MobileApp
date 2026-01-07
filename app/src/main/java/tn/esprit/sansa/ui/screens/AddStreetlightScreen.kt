@@ -71,22 +71,55 @@ fun AddStreetlightScreen(
     val scope = rememberCoroutineScope()
 
     // Auto-generate ID on screen load OR load existing data
-    LaunchedEffect(editingStreetlightId) {
+    var initialStreetlight by remember { mutableStateOf<Streetlight?>(null) }
+
+    LaunchedEffect(editingStreetlightId, zones) {
         if (isEditMode) {
             val streetlight = viewModel.getStreetlightById(editingStreetlightId!!)
             if (streetlight != null) {
-                streetlightId = streetlight.id
-                address = streetlight.address
-                selectedZone = zones.find { it.id == streetlight.zoneId }
-                latitude = streetlight.latitude
-                longitude = streetlight.longitude
-                bulbType = streetlight.bulbType
-                status = streetlight.status
-                powerConsumption = streetlight.powerConsumption.toString()
-                hasCharger = streetlight.hasCharger
+                // Initialize state only once
+                if (initialStreetlight == null) {
+                    initialStreetlight = streetlight
+                    streetlightId = streetlight.id
+                    address = streetlight.address
+                    latitude = streetlight.latitude
+                    longitude = streetlight.longitude
+                    bulbType = streetlight.bulbType
+                    status = streetlight.status
+                    powerConsumption = streetlight.powerConsumption.toString()
+                    hasCharger = streetlight.hasCharger
+                }
+
+                // Try to resolve zone whenever zones or streetlight are available
+                if (selectedZone == null) {
+                    selectedZone = zones.find { it.id == streetlight.zoneId }
+                }
             }
         } else {
-            streetlightId = viewModel.generateNextStreetlightId()
+            if (streetlightId.isEmpty()) {
+                streetlightId = viewModel.generateNextStreetlightId()
+            }
+        }
+    }
+
+    val hasChanges by remember(
+        initialStreetlight, address, latitude, longitude, bulbType, status,
+        powerConsumption, selectedZone, hasCharger
+    ) {
+        derivedStateOf {
+            if (!isEditMode) return@derivedStateOf true
+            val initial = initialStreetlight ?: return@derivedStateOf false
+
+            val currentConsumption = powerConsumption.toDoubleOrNull() ?: 0.0
+            
+            initial.address != address ||
+            initial.latitude != latitude ||
+            initial.longitude != longitude ||
+            initial.bulbType != bulbType ||
+            initial.status != status ||
+            initial.powerConsumption != currentConsumption ||
+            initial.zoneId != selectedZone?.id ||
+            initial.hasCharger != hasCharger
         }
     }
 
@@ -329,7 +362,11 @@ fun AddStreetlightScreen(
                         .height(56.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = NoorIndigo),
                     shape = RoundedCornerShape(16.dp),
-                    enabled = streetlightId.isNotBlank() && selectedZone != null && !address.contains("Sélectionnez") && !isLoadingAddress
+                    enabled = (if (isEditMode) hasChanges else true) && 
+                            streetlightId.isNotBlank() && 
+                            selectedZone != null && 
+                            !address.contains("Sélectionnez") && 
+                            !isLoadingAddress
                 ) {
                     Icon(if (isEditMode) Icons.Default.Update else Icons.Default.Save, null)
                     Spacer(Modifier.width(12.dp))

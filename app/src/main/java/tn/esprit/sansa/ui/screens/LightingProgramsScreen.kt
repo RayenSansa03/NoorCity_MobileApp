@@ -55,7 +55,8 @@ fun LightingProgramsScreen(
     viewModel: LightingProgramsViewModel = viewModel(),
     role: UserRole? = UserRole.CITIZEN,
     modifier: Modifier = Modifier,
-    onNavigateToAddProgram: () -> Unit = {}
+    onNavigateToAddProgram: () -> Unit = {},
+    onNavigateToEditProgram: (String) -> Unit = {}
 ) {
     val programsList by viewModel.programs.collectAsState()
     var showTutorial by rememberSaveable { mutableStateOf(true) }
@@ -170,9 +171,13 @@ fun LightingProgramsScreen(
                         StaggeredItem(index = index) {
                             SwipeActionsContainer(
                                 item = program,
-                                onDelete = { viewModel.deleteProgram(program.id) }
+                                onDelete = { viewModel.deleteProgram(program.id) },
+                                onEdit = if (role == UserRole.ADMIN) { { p -> onNavigateToEditProgram(p.id) } } else null
                             ) { item ->
-                                LightingProgramCard(program = item)
+                                LightingProgramCard(
+                                    program = item,
+                                    onEdit = if (role == UserRole.ADMIN) { { onNavigateToEditProgram(item.id) } } else null
+                                )
                             }
                         }
 
@@ -379,7 +384,7 @@ private fun AmbienceFilters(
 }
 
 @Composable
-private fun LightingProgramCard(program: LightingProgram) {
+private fun LightingProgramCard(program: LightingProgram, onEdit: (() -> Unit)? = null) {
     var expanded by remember { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
@@ -535,7 +540,7 @@ private fun LightingProgramCard(program: LightingProgram) {
 
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         OutlinedButton(
-                            onClick = { /* TODO */ },
+                            onClick = { onEdit?.invoke() },
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(Icons.Default.Edit, null, modifier = Modifier.size(18.dp))

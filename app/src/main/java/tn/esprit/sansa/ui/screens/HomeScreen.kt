@@ -41,6 +41,7 @@ fun HomeScreenModern(
     settingsViewModel: SettingsViewModel = viewModel(),
     adminDashboardViewModel: AdminDashboardViewModel = viewModel(),
     role: UserRole? = UserRole.CITIZEN,
+    userName: String? = null,
     onNavigate: (String) -> Unit = {}
 ) {
     val stats by adminDashboardViewModel.stats.collectAsState()
@@ -69,13 +70,13 @@ fun HomeScreenModern(
                     modifier = Modifier.padding(24.dp, 64.dp, 24.dp, 32.dp)
                 ) {
                     Text(
-                        text = "Bienvenue, " + (role?.name ?: "Utilisateur"),
+                        text = "Bienvenue, ${userName ?: (role?.name ?: "Utilisateur")}",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
                     Text(
-                        text = "Sansa Smart City",
+                        text = "NoorCity",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

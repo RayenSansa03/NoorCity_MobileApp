@@ -2,4 +2,10 @@
 <resources>
 
     <style name="Theme.Sansa" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <style name="Theme.App.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenAnimatedIcon">@drawable/noor_logo</item>
+        <item name="windowSplashScreenBackground">#FFFFFF</item>
+        <item name="postSplashScreenTheme">@style/Theme.Sansa</item>
+    </style>
 </resources>

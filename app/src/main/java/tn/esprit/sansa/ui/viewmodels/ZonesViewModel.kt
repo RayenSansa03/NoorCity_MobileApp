@@ -83,6 +83,14 @@ class ZonesViewModel : ViewModel() {
         loadZones()
     }
 
+    fun getZoneById(id: String): Zone? {
+        return _zones.value.find { it.id == id }
+    }
+
+    fun updateZone(zone: Zone, onComplete: (Boolean) -> Unit) {
+        repository.addZone(zone, onComplete)
+    }
+
     /**
      * Generate next sequential zone ID (format: Z001, Z002, etc.)
      */

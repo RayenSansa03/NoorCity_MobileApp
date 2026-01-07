@@ -37,11 +37,45 @@ fun RegisterScreen(
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var emailError by remember { mutableStateOf<String?>(null) }
+    var passwordError by remember { mutableStateOf<String?>(null) }
     
     var observedLoading by remember { mutableStateOf(false) }
     
     val authState by viewModel.authState.collectAsState()
     val context = LocalContext.current
+
+    // Validation helpers
+    fun isValidEmail(email: String): Boolean {
+        return android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
+    }
+
+    fun getPasswordStrength(password: String): Int {
+        var strength = 0
+        if (password.length >= 8) strength++
+        if (password.any { it.isUpperCase() }) strength++
+        if (password.any { it.isDigit() }) strength++
+        if (password.any { !it.isLetterOrDigit() }) strength++
+        return strength
+    }
+
+    fun getPasswordStrengthLabel(strength: Int): String {
+        return when (strength) {
+            0, 1 -> "Faible"
+            2 -> "Moyen"
+            3, 4 -> "Fort"
+            else -> ""
+        }
+    }
+
+    fun getPasswordStrengthColor(strength: Int): Color {
+        return when (strength) {
+            0, 1 -> Color.Red
+            2 -> Color(0xFFFF9800)
+            3, 4 -> Color(0xFF4CAF50)
+            else -> Color.Gray
+        }
+    }
 
     LaunchedEffect(authState) {
         if (authState is AuthState.Loading) {
@@ -140,28 +174,46 @@ fun RegisterScreen(
 
                 OutlinedTextField(
                     value = email,
-                    onValueChange = { email = it },
+                    onValueChange = { 
+                        email = it
+                        emailError = if (it.isNotBlank() && !isValidEmail(it)) {
+                            "Format d'email invalide"
+                        } else null
+                    },
                     placeholder = { Text("Adresse email", color = Color.Gray.copy(alpha = 0.6f)) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
                     singleLine = true,
-                    leadingIcon = { Icon(Icons.Default.Email, null, tint = NoorBlue.copy(alpha = 0.7f), modifier = Modifier.size(20.dp)) },
+                    isError = emailError != null,
+                    leadingIcon = { Icon(Icons.Default.Email, null, tint = if (emailError != null) Color.Red else NoorBlue.copy(alpha = 0.7f), modifier = Modifier.size(20.dp)) },
+                    supportingText = emailError?.let { { Text(it, color = Color.Red, fontSize = 12.sp) } },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = NoorBlue,
                         unfocusedBorderColor = Color.LightGray.copy(alpha = 0.5f),
                         focusedContainerColor = NoorBlue.copy(alpha = 0.02f),
-                        unfocusedContainerColor = NoorBlue.copy(alpha = 0.02f)
+                        unfocusedContainerColor = NoorBlue.copy(alpha = 0.02f),
+                        errorBorderColor = Color.Red
                     )
                 )
 
                 OutlinedTextField(
                     value = password,
-                    onValueChange = { password = it },
+                    onValueChange = { 
+                        password = it
+                        passwordError = when {
+                            it.isBlank() -> null
+                            it.length < 8 -> "Minimum 8 caractères"
+                            !it.any { c -> c.isUpperCase() } -> "Au moins une majuscule"
+                            !it.any { c -> c.isDigit() } -> "Au moins un chiffre"
+                            else -> null
+                        }
+                    },
                     placeholder = { Text("Mot de passe", color = Color.Gray.copy(alpha = 0.6f)) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
                     singleLine = true,
-                    leadingIcon = { Icon(Icons.Default.Lock, null, tint = NoorBlue.copy(alpha = 0.7f), modifier = Modifier.size(20.dp)) },
+                    isError = passwordError != null,
+                    leadingIcon = { Icon(Icons.Default.Lock, null, tint = if (passwordError != null) Color.Red else NoorBlue.copy(alpha = 0.7f), modifier = Modifier.size(20.dp)) },
                     trailingIcon = {
                         IconButton(onClick = { passwordVisible = !passwordVisible }) {
                             Icon(
@@ -172,14 +224,40 @@ fun RegisterScreen(
                             )
                         }
                     },
+                    supportingText = passwordError?.let { { Text(it, color = Color.Red, fontSize = 12.sp) } },
                     visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = NoorBlue,
                         unfocusedBorderColor = Color.LightGray.copy(alpha = 0.5f),
                         focusedContainerColor = NoorBlue.copy(alpha = 0.02f),
-                        unfocusedContainerColor = NoorBlue.copy(alpha = 0.02f)
+                        unfocusedContainerColor = NoorBlue.copy(alpha = 0.02f),
+                        errorBorderColor = Color.Red
                     )
                 )
+
+                // Password strength indicator
+                if (password.isNotBlank()) {
+                    val strength = getPasswordStrength(password)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("Force:", fontSize = 12.sp, color = Color.Gray)
+                        LinearProgressIndicator(
+                            progress = strength / 4f,
+                            modifier = Modifier.weight(1f).height(4.dp).clip(RoundedCornerShape(2.dp)),
+                            color = getPasswordStrengthColor(strength),
+                            trackColor = Color.LightGray.copy(alpha = 0.3f)
+                        )
+                        Text(
+                            getPasswordStrengthLabel(strength),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = getPasswordStrengthColor(strength)
+                        )
+                    }
+                }
 
                 OutlinedTextField(
                     value = confirmPassword,
@@ -214,7 +292,13 @@ fun RegisterScreen(
                     shape = RoundedCornerShape(20.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = NoorBlue),
                     elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
-                    enabled = authState !is AuthState.Loading && name.isNotBlank() && email.isNotBlank() && password.length >= 6
+                    enabled = authState !is AuthState.Loading && 
+                              name.isNotBlank() && 
+                              email.isNotBlank() && 
+                              password.length >= 8 &&
+                              emailError == null &&
+                              passwordError == null &&
+                              password == confirmPassword
                 ) {
                     if (authState is AuthState.Loading) {
                         CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)

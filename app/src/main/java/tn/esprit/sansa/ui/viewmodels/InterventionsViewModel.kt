@@ -31,7 +31,15 @@ class InterventionsViewModel : ViewModel() {
         }
     }
 
+    fun getInterventionById(id: String): Intervention? {
+        return _interventions.value.find { it.id == id }
+    }
+
     fun addIntervention(intervention: Intervention, onComplete: (Boolean) -> Unit) {
+        repository.addIntervention(intervention, onComplete)
+    }
+
+    fun updateIntervention(intervention: Intervention, onComplete: (Boolean) -> Unit) {
         repository.addIntervention(intervention, onComplete)
     }
 

@@ -17,9 +17,11 @@ mlkitBarcode = "17.3.0"
 camerax = "1.4.1"
 playServicesAuth = "21.3.0"
 facebookSdk = "17.0.0"
-tensorflowLite = "2.14.0"
+tensorflowLite = "2.16.1"
 tensorflowLiteSupport = "0.4.4"
+tensorflowLiteTask = "0.4.4"
 stripe = "21.6.0"
+splashscreen = "1.0.1"
 
 
 [libraries]
@@ -58,6 +60,7 @@ tensorflow-lite-metadata = { group = "org.tensorflow", name = "tensorflow-lite-m
 tensorflow-lite-gpu = { group = "org.tensorflow", name = "tensorflow-lite-gpu", version.ref = "tensorflowLite" }
 tensorflow-lite-task-vision = { group = "org.tensorflow", name = "tensorflow-lite-task-vision", version.ref = "tensorflowLiteSupport" }
 stripe-android = { group = "com.stripe", name = "stripe-android", version.ref = "stripe" }
+androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "splashscreen" }
 
 
 [plugins]

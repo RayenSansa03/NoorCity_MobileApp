@@ -31,32 +31,41 @@ import java.util.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddLightingProgramScreen(
+    editingProgramId: String? = null,
     modifier: Modifier = Modifier,
     viewModel: LightingProgramsViewModel = viewModel(),
     culturalEventsViewModel: CulturalEventsViewModel = viewModel(),
     onAddSuccess: () -> Unit = {},
     onBackPressed: () -> Unit = {}
 ) {
+    val isEditMode = editingProgramId != null
+    var initialProgram by remember { mutableStateOf<LightingProgram?>(null) }
+    
     var currentStep by remember { mutableStateOf(0) }
     var selectedEvent by remember { mutableStateOf<CulturalEvent?>(null) }
     var selectedTechnician by remember { mutableStateOf<Technician?>(null) }
     var selectedStreetlights by remember { mutableStateOf(setOf<String>()) }
     var selectedAmbience by remember { mutableStateOf(LightingAmbience.NORMAL) }
     var timelinePoints by remember { mutableStateOf(listOf<TimelinePoint>()) }
-    
-    // Default timeline based on ambience
-    LaunchedEffect(selectedAmbience) {
-        timelinePoints = listOf(
-            TimelinePoint(18, 0, selectedAmbience.intensity / 2),
-            TimelinePoint(20, 0, selectedAmbience.intensity),
-            TimelinePoint(0, 0, selectedAmbience.intensity),
-            TimelinePoint(6, 0, 0)
-        )
-    }
-    
+
     // Fetch data
     val allStreetlights by viewModel.streetlights.collectAsState()
     val rawEvents by culturalEventsViewModel.events.collectAsState()
+
+    // Load existing data if in edit mode
+    LaunchedEffect(editingProgramId, allStreetlights, rawEvents) {
+        if (isEditMode) {
+            val program = viewModel.getProgramById(editingProgramId!!)
+            if (program != null && initialProgram == null) {
+                initialProgram = program
+                selectedEvent = rawEvents.find { it.id == program.eventId }
+                selectedTechnician = culturalEventsViewModel.getAllTechnicians().find { it.id == program.technicianId }
+                selectedStreetlights = program.associatedStreetlights.toSet()
+                selectedAmbience = program.ambience
+                timelinePoints = program.timeline
+            }
+        }
+    }
     
     // Filter events
     val availableEvents = remember(rawEvents) {
@@ -64,11 +73,9 @@ fun AddLightingProgramScreen(
     }
     
     // Filter technicians (All available, as requested)
+    // Filter technicians (All available, as requested)
     val availableTechnicians = remember(selectedEvent) {
-        culturalEventsViewModel.getAvailableTechnicians(
-            "", // Ignorer le filtrage par zone
-            selectedEvent?.dateTime ?: Date()
-        )
+        culturalEventsViewModel.getAllTechnicians()
     }
     
     // Filter streetlights (All available, as requested)
@@ -79,7 +86,7 @@ fun AddLightingProgramScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text("Nouveau Programme d'Éclairage", fontWeight = FontWeight.Bold) },
+                title = { Text(if (isEditMode) "Modifier le Programme" else "Nouveau Programme d'Éclairage", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBackPressed) {
                         Icon(Icons.Default.ArrowBack, "Retour")
@@ -109,22 +116,40 @@ fun AddLightingProgramScreen(
                     val sdf = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
                     val now = sdf.format(Date())
                     
-                    val program = LightingProgram(
-                        id = "",
-                        name = "Noor: ${selectedEvent!!.name}",
-                        timeline = timelinePoints,
-                        ambience = selectedAmbience,
-                        associatedStreetlights = selectedStreetlights.toList(),
-                        status = ProgramStatus.PENDING,
-                        createdDate = now,
-                        lastModified = now,
-                        priority = 5,
-                        description = "Programme intelligent pour ${selectedEvent!!.name}",
-                        eventId = selectedEvent?.id,
-                        technicianId = selectedTechnician?.id,
-                        technicianStatus = TechnicianAssignmentStatus.WAITING
-                    )
-                    viewModel.addProgram(program) { onAddSuccess() }
+                    val program = if (isEditMode) {
+                        initialProgram!!.copy(
+                            name = "Noor: ${selectedEvent!!.name}",
+                            timeline = timelinePoints,
+                            ambience = selectedAmbience,
+                            associatedStreetlights = selectedStreetlights.toList(),
+                            lastModified = now,
+                            description = "Programme intelligent pour ${selectedEvent!!.name}",
+                            eventId = selectedEvent?.id,
+                            technicianId = selectedTechnician?.id
+                        )
+                    } else {
+                        LightingProgram(
+                            id = "",
+                            name = "Noor: ${selectedEvent!!.name}",
+                            timeline = timelinePoints,
+                            ambience = selectedAmbience,
+                            associatedStreetlights = selectedStreetlights.toList(),
+                            status = ProgramStatus.PENDING,
+                            createdDate = now,
+                            lastModified = now,
+                            priority = 5,
+                            description = "Programme intelligent pour ${selectedEvent!!.name}",
+                            eventId = selectedEvent?.id,
+                            technicianId = selectedTechnician?.id,
+                            technicianStatus = TechnicianAssignmentStatus.WAITING
+                        )
+                    }
+                    
+                    if (isEditMode) {
+                        viewModel.updateProgram(program) { onAddSuccess() }
+                    } else {
+                        viewModel.addProgram(program) { onAddSuccess() }
+                    }
                 }
             )
         }
@@ -510,7 +535,7 @@ fun TechnicianSelectionStep(
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "Tous les techniciens disponibles",
+                text = "Tous les techniciens",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -529,8 +554,8 @@ fun TechnicianSelectionStep(
             item {
                 EmptyStateCard(
                     icon = Icons.Default.Person,
-                    message = "Aucun technicien disponible",
-                    description = "Aucun technicien n'est assigné à la zone $eventZone"
+                    message = "Aucun technicien trouvé",
+                    description = "Aucun technicien n'est enregistré dans le système"
                 )
             }
         }

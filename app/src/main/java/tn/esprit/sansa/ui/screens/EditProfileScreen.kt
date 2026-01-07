@@ -26,9 +26,11 @@ import tn.esprit.sansa.ui.viewmodels.AuthViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+
 fun EditProfileScreen(
     onBack: () -> Unit,
     onChangePassword: () -> Unit,
+    onSetSecurityQuestions: () -> Unit, // New parameter
     onSuccess: () -> Unit, // Navigate back or show success message then back
     viewModel: AuthViewModel = viewModel()
 ) {
@@ -145,6 +147,19 @@ fun EditProfileScreen(
             }
 
             Spacer(Modifier.height(32.dp))
+
+            // --- Security Section ---
+            OutlinedButton(
+                onClick = onSetSecurityQuestions,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+            ) {
+                Icon(Icons.Outlined.Security, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Configurer questions de sécurité")
+            }
+
+            Spacer(Modifier.height(16.dp))
 
             // --- Password Change Button ---
             OutlinedButton(

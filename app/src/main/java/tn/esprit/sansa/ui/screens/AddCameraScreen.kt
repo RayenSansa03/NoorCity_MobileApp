@@ -37,6 +37,7 @@ import tn.esprit.sansa.ui.theme.*
 import androidx.compose.ui.text.style.TextAlign
 import tn.esprit.sansa.ui.screens.models.*
 import tn.esprit.sansa.ui.viewmodels.CamerasViewModel
+import tn.esprit.sansa.ui.viewmodels.StreetlightsViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -50,29 +51,54 @@ import androidx.compose.ui.platform.LocalContext
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddCameraScreen(
+    editingCameraId: String? = null,
     onAddSuccess: () -> Unit = {},
     modifier: Modifier = Modifier,
-    viewModel: CamerasViewModel = viewModel()
+    viewModel: CamerasViewModel = viewModel(),
+    streetlightsViewModel: StreetlightsViewModel = viewModel()
 ) {
+    val isEditMode = editingCameraId != null
+    var initialCamera by remember { mutableStateOf<Camera?>(null) }
+    
     var location by remember { mutableStateOf("") }
-    var associatedStreetlight by remember { mutableStateOf("") }
+    var selectedStreetlight by remember { mutableStateOf<Streetlight?>(null) }
     var type by remember { mutableStateOf<CameraType?>(null) }
     var status by remember { mutableStateOf(CameraStatus.ONLINE) }
     var resolution by remember { mutableStateOf("1080p") }
-    var zone by remember { mutableStateOf("") }
     var nightVision by remember { mutableStateOf(true) }
     var recordingEnabled by remember { mutableStateOf(true) }
     var motionDetection by remember { mutableStateOf(true) }
     var streamUrl by remember { mutableStateOf("") }
+    var showStreetlightDropdown by remember { mutableStateOf(false) }
 
     var showLocationError by remember { mutableStateOf(false) }
     var showStreetlightError by remember { mutableStateOf(false) }
     var showTypeError by remember { mutableStateOf(false) }
 
+    val streetlights by streetlightsViewModel.streetlights.collectAsState()
     val scrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var showSuccessAnimation by remember { mutableStateOf(false) }
+
+    LaunchedEffect(editingCameraId, streetlights) {
+        if (isEditMode) {
+            val camera = viewModel.getCameraById(editingCameraId!!)
+            if (camera != null && initialCamera == null) {
+                initialCamera = camera
+                location = camera.location
+                type = camera.type
+                status = camera.status
+                resolution = camera.resolution
+                nightVision = camera.nightVision
+                recordingEnabled = camera.recordingEnabled
+                motionDetection = camera.motionDetection
+                streamUrl = camera.streamUrl
+                
+                selectedStreetlight = streetlights.find { it.id == camera.associatedStreetlight }
+            }
+        }
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -80,8 +106,8 @@ fun AddCameraScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Nouvelle caméra", fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                        Text("Sécurité et surveillance intelligente", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(if (isEditMode) "Modifier caméra" else "Nouvelle caméra", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                        Text(if (isEditMode) "Mise à jour du dispositif" else "Sécurité et surveillance intelligente", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
                 navigationIcon = {
@@ -122,36 +148,93 @@ fun AddCameraScreen(
 
                 // Section 2: Localisation
                 FormSection(
-                    title = "Emplacement & Zone",
+                    title = "Emplacement & Lampadaire",
                     icon = Icons.Default.LocationOn,
-                    isError = showLocationError || showStreetlightError
+                    isError = showStreetlightError
                 ) {
-                    CustomTextField(
-                        value = location,
-                        onValueChange = { location = it; showLocationError = false },
-                        label = "Localisation",
-                        placeholder = "Ex: Entrée Nord, Parking B...",
-                        isError = showLocationError
-                    )
+                    Text("Lampadaire associé", fontSize = 13.sp, color = if (showStreetlightError) NoorRed else MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
                     
-                    Spacer(Modifier.height(12.dp))
+                    Box {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(54.dp)
+                                .clickable { showStreetlightDropdown = !showStreetlightDropdown },
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(
+                                width = 1.5.dp,
+                                color = if (showStreetlightError) NoorRed else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = selectedStreetlight?.id ?: "Sélectionnez un lampadaire",
+                                    fontSize = 15.sp,
+                                    color = if (selectedStreetlight != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                )
+                                Icon(
+                                    if (showStreetlightDropdown) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
+                                    null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
 
-                    CustomTextField(
-                        value = associatedStreetlight,
-                        onValueChange = { associatedStreetlight = it; showStreetlightError = false },
-                        label = "ID Lampadaire",
-                        placeholder = "Ex: L001",
-                        isError = showStreetlightError
-                    )
+                        DropdownMenu(
+                            expanded = showStreetlightDropdown,
+                            onDismissRequest = { showStreetlightDropdown = false },
+                            modifier = Modifier.fillMaxWidth(0.9f)
+                        ) {
+                            if (streetlights.isEmpty()) {
+                                DropdownMenuItem(
+                                    text = { Text("Aucun lampadaire disponible", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                                    onClick = { }
+                                )
+                            } else {
+                                streetlights.forEach { streetlight ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Column {
+                                                Text(streetlight.id, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                                Text(streetlight.address, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            }
+                                        },
+                                        onClick = {
+                                            selectedStreetlight = streetlight
+                                            location = streetlight.address
+                                            showStreetlightError = false
+                                            showStreetlightDropdown = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
 
-                    Spacer(Modifier.height(12.dp))
-
-                    CustomTextField(
-                        value = zone,
-                        onValueChange = { zone = it },
-                        label = "Zone de la ville",
-                        placeholder = "Ex: Centre-ville, Zone Industrielle..."
-                    )
+                    if (selectedStreetlight != null) {
+                        Spacer(Modifier.height(12.dp))
+                        Text("Adresse (auto-remplie)", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(NoorBlue.copy(alpha = 0.05f))
+                                .border(1.dp, NoorBlue.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
+                                .padding(16.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Icon(Icons.Default.LocationOn, null, tint = NoorBlue, modifier = Modifier.size(20.dp))
+                                Text(location, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface)
+                            }
+                        }
+                    }
 
                     Spacer(Modifier.height(12.dp))
 
@@ -202,30 +285,48 @@ fun AddCameraScreen(
 
                 // Boutons d'action
                 ActionButtons(
+                    isEditMode = isEditMode,
                     onCancel = onAddSuccess,
                     onAdd = {
                         var hasError = false
                         if (type == null) { showTypeError = true; hasError = true }
-                        if (location.isBlank()) { showLocationError = true; hasError = true }
-                        if (associatedStreetlight.isBlank()) { showStreetlightError = true; hasError = true }
+                        if (selectedStreetlight == null) { showStreetlightError = true; hasError = true }
 
                         if (!hasError) {
-                            val newCamera = Camera(
-                                id = "CAM_${UUID.randomUUID().toString().take(6).uppercase()}",
-                                location = location,
-                                status = status,
-                                associatedStreetlight = associatedStreetlight,
-                                type = type!!,
-                                resolution = resolution,
-                                zone = zone,
-                                nightVision = nightVision,
-                                recordingEnabled = recordingEnabled,
-                                motionDetection = motionDetection,
-                                installDate = "30/12/2025",
-                                lastMaintenance = "Jamais",
-                                streamUrl = streamUrl
-                            )
-                            viewModel.addCamera(newCamera) { success ->
+                            val cameraToSave = if (isEditMode && initialCamera != null) {
+                                initialCamera!!.copy(
+                                    location = location,
+                                    status = status,
+                                    associatedStreetlight = selectedStreetlight!!.id,
+                                    type = type!!,
+                                    resolution = resolution,
+                                    zone = selectedStreetlight!!.zoneId,
+                                    nightVision = nightVision,
+                                    recordingEnabled = recordingEnabled,
+                                    motionDetection = motionDetection,
+                                    streamUrl = streamUrl
+                                )
+                            } else {
+                                Camera(
+                                    id = if (isEditMode) (initialCamera?.id ?: "CAM_RECOVERED") else "CAM_${UUID.randomUUID().toString().take(6).uppercase()}",
+                                    location = location,
+                                    status = status,
+                                    associatedStreetlight = selectedStreetlight!!.id,
+                                    type = type!!,
+                                    resolution = resolution,
+                                    zone = selectedStreetlight!!.zoneId,
+                                    nightVision = nightVision,
+                                    recordingEnabled = recordingEnabled,
+                                    motionDetection = motionDetection,
+                                    installDate = initialCamera?.installDate ?: "30/12/2025",
+                                    lastMaintenance = initialCamera?.lastMaintenance ?: "Jamais",
+                                    streamUrl = streamUrl
+                                )
+                            }
+
+                            val action: (Camera, (Boolean) -> Unit) -> Unit = if (isEditMode) viewModel::updateCameraStatus else viewModel::addCamera
+                            
+                            action(cameraToSave) { success ->
                                 if (success) {
                                     showSuccessAnimation = true
                                     scope.launch {
@@ -233,7 +334,7 @@ fun AddCameraScreen(
                                         onAddSuccess()
                                     }
                                 } else {
-                                    Toast.makeText(context, "Erreur lors de l'ajout à la base de données", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(context, "Erreur lors de l'enregistrement", Toast.LENGTH_LONG).show()
                                 }
                             }
                         }
@@ -491,7 +592,7 @@ private fun ToggleItem(icon: ImageVector, label: String, checked: Boolean, onChe
 }
 
 @Composable
-private fun ActionButtons(onCancel: () -> Unit, onAdd: () -> Unit) {
+private fun ActionButtons(isEditMode: Boolean, onCancel: () -> Unit, onAdd: () -> Unit) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         OutlinedButton(
             onClick = onCancel,
@@ -507,9 +608,9 @@ private fun ActionButtons(onCancel: () -> Unit, onAdd: () -> Unit) {
             shape = RoundedCornerShape(14.dp),
             colors = ButtonDefaults.buttonColors(containerColor = NoorBlue)
         ) {
-            Icon(Icons.Default.Add, null, modifier = Modifier.size(20.dp))
+            Icon(if (isEditMode) Icons.Default.Update else Icons.Default.Save, null, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
-            Text("Ajouter", fontWeight = FontWeight.Bold)
+            Text(if (isEditMode) "Mettre à jour" else "Enregistrer", fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -531,8 +632,8 @@ private fun CameraSuccessAnimation() {
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
                 Icon(Icons.Default.CheckCircle, null, tint = NoorGreen, modifier = Modifier.size(80.dp))
-                Text("Caméra Ajoutée !", fontSize = 24.sp, fontWeight = FontWeight.Black)
-                Text("Votre dispositif est prêt et configuré.", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("C'est prêt !", fontSize = 24.sp, fontWeight = FontWeight.Black)
+                Text("Les modifications ont été enregistrées avec succès.", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

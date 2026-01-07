@@ -6,6 +6,11 @@ enum class UserRole(val displayName: String) {
     ADMIN("Administrateur")
 }
 
+data class SecurityQuestion(
+    val question: String = "",
+    val answer: String = ""
+)
+
 data class UserAccount(
     val uid: String = "",
     val name: String = "",
@@ -20,5 +25,6 @@ data class UserAccount(
     val activatedAt: Long? = null,
     val phoneNumber: String = "",
     val workingZone: String = "",
-    val coordinates: String = ""
+    val coordinates: String = "",
+    val securityQuestions: List<SecurityQuestion> = emptyList()
 )

@@ -56,8 +56,14 @@ fun LoginScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var emailError by remember { mutableStateOf<String?>(null) }
     val authState by viewModel.authState.collectAsState()
     val context = LocalContext.current
+
+    // Email validation helper
+    fun isValidEmail(email: String): Boolean {
+        return android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
+    }
 
     // -- GOOGLE SIGN IN CONFIG --
     val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -109,17 +115,22 @@ fun LoginScreen(
     var observedLoading by remember { mutableStateOf(false) }
 
     LaunchedEffect(authState) {
-        if (authState is AuthState.Loading) {
-            observedLoading = true
-        }
-        if (authState is AuthState.Authenticated) {
-            // Only auto-login if allowed OR if it's the result of an explicit action (loading happened)
-            if (allowAutoLogin || observedLoading) {
-                onLoginSuccess()
+        when (authState) {
+            is AuthState.Loading -> {
+                observedLoading = true
             }
-        } else if (authState is AuthState.Error) {
-            Toast.makeText(context, (authState as AuthState.Error).message, Toast.LENGTH_LONG).show()
-            viewModel.clearError()
+            is AuthState.Error -> {
+                observedLoading = false
+                Toast.makeText(context, (authState as AuthState.Error).message, Toast.LENGTH_LONG).show()
+                viewModel.clearError()
+            }
+            is AuthState.Authenticated -> {
+                // Only auto-login if allowed OR if it's the result of an explicit action (loading happened)
+                if (allowAutoLogin || observedLoading) {
+                    onLoginSuccess()
+                }
+            }
+            else -> { /* Idle or Unauthenticated - do nothing */ }
         }
     }
 
@@ -216,15 +227,23 @@ fun LoginScreen(
 
                     OutlinedTextField(
                         value = email,
-                        onValueChange = { email = it },
+                        onValueChange = { 
+                            email = it
+                            emailError = if (it.isNotBlank() && !isValidEmail(it)) {
+                                "Format d'email invalide"
+                            } else null
+                        },
                         label = { Text("Adresse email") },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
                         singleLine = true,
-                        leadingIcon = { Icon(Icons.Outlined.Email, null, tint = NoorBlue) },
+                        isError = emailError != null,
+                        leadingIcon = { Icon(Icons.Outlined.Email, null, tint = if (emailError != null) Color.Red else NoorBlue) },
+                        supportingText = emailError?.let { { Text(it, color = Color.Red) } },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = NoorBlue,
-                            unfocusedBorderColor = Color.LightGray.copy(alpha = 0.5f)
+                            unfocusedBorderColor = Color.LightGray.copy(alpha = 0.5f),
+                            errorBorderColor = Color.Red
                         )
                     )
 
@@ -266,13 +285,19 @@ fun LoginScreen(
                     Spacer(Modifier.height(24.dp))
 
                     Button(
-                        onClick = { viewModel.loginWithEmail(email, password) },
+                        onClick = { 
+                            if (isValidEmail(email)) {
+                                viewModel.loginWithEmail(email, password)
+                            } else {
+                                emailError = "Veuillez entrer un email valide"
+                            }
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = NoorBlue),
-                        enabled = authState !is AuthState.Loading
+                        enabled = authState !is AuthState.Loading && email.isNotBlank() && password.isNotBlank() && emailError == null
                     ) {
                         if (authState is AuthState.Loading) {
                             CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))

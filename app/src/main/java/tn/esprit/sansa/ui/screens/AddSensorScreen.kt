@@ -60,9 +60,14 @@ private val mockStreetlights = listOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddSensorScreen(
+    editingSensorId: String? = null,
     onBack: () -> Unit,
-    viewModel: SensorsViewModel = viewModel()
+    viewModel: SensorsViewModel = viewModel(),
+    streetlightsViewModel: tn.esprit.sansa.ui.viewmodels.StreetlightsViewModel = viewModel()
 ) {
+    val isEditMode = editingSensorId != null
+    var initialSensor by remember { mutableStateOf<Sensor?>(null) }
+    
     var selectedType by remember { mutableStateOf<SensorType?>(null) }
     var selectedStreetlight by remember { mutableStateOf("") }
     var batteryLevel by remember { mutableStateOf(100f) }
@@ -75,8 +80,24 @@ fun AddSensorScreen(
 
     val scrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
+    val streetlights by streetlightsViewModel.streetlights.collectAsState()
 
     var showSuccessAnimation by remember { mutableStateOf(false) }
+
+    LaunchedEffect(editingSensorId, streetlights) {
+        if (isEditMode) {
+            val sensor = viewModel.getSensorById(editingSensorId!!)
+            if (sensor != null && initialSensor == null) {
+                initialSensor = sensor
+                hardwareId = sensor.id
+                selectedType = sensor.type
+                batteryLevel = sensor.batteryLevel.toFloat()
+                selectedStatus = sensor.status
+                
+                selectedStreetlight = streetlights.find { it.id == sensor.streetlightId }?.let { "${it.id} - ${it.address}" } ?: ""
+            }
+        }
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -85,7 +106,7 @@ fun AddSensorScreen(
                 title = {
                     Column {
                         Text(
-                            "Ajouter un capteur",
+                            if (isEditMode) "Modifier le capteur" else "Ajouter un capteur",
                             fontWeight = FontWeight.Bold,
                             fontSize = 20.sp
                         )
@@ -125,13 +146,16 @@ fun AddSensorScreen(
                     CustomTextField(
                         value = hardwareId,
                         onValueChange = {
-                            hardwareId = it
-                            showIdError = false
+                            if (!isEditMode) {
+                                hardwareId = it
+                                showIdError = false
+                            }
                         },
                         label = "ID du Capteur",
                         placeholder = "Ex: TEMP_A1B2C3",
                         isError = showIdError,
-                        keyboardType = KeyboardType.Text
+                        keyboardType = KeyboardType.Text,
+                        enabled = !isEditMode
                     )
                     Text(
                         "Saisissez l'ID affiché dans le moniteur série de l'ESP32",
@@ -178,6 +202,7 @@ fun AddSensorScreen(
                 ) {
                     StreetlightDropdown(
                         selectedStreetlight = selectedStreetlight,
+                        streetlights = streetlights,
                         onStreetlightSelected = {
                             selectedStreetlight = it
                             showStreetlightError = false
@@ -217,6 +242,7 @@ fun AddSensorScreen(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 ActionButtons(
+                    isEditMode = isEditMode,
                     onCancel = onBack,
                     onAdd = {
                         var hasError = false
@@ -235,18 +261,32 @@ fun AddSensorScreen(
                         }
 
                         if (!hasError) {
-                            val newSensor = Sensor(
-                                id = hardwareId.trim(),
-                                type = selectedType!!,
-                                streetlightId = selectedStreetlight.split(" - ").first(),
-                                streetlightName = selectedStreetlight.split(" - ").last(),
-                                currentValue = "--", // Valeur d'attente
-                                status = selectedStatus,
-                                lastUpdate = "En attente...",
-                                batteryLevel = batteryLevel.toInt()
-                            )
+                             val sensorToSave = if (isEditMode && initialSensor != null) {
+                                initialSensor!!.copy(
+                                    type = selectedType!!,
+                                    streetlightId = selectedStreetlight.split(" - ").first(),
+                                    streetlightName = selectedStreetlight.split(" - ").last(),
+                                    status = selectedStatus,
+                                    batteryLevel = batteryLevel.toInt()
+                                )
+                            } else {
+                                Sensor(
+                                    id = hardwareId.trim(),
+                                    type = selectedType!!,
+                                    streetlightId = selectedStreetlight.split(" - ").first(),
+                                    streetlightName = selectedStreetlight.split(" - ").last(),
+                                    currentValue = "--", // Valeur d'attente
+                                    status = selectedStatus,
+                                    lastUpdate = "En attente...",
+                                    batteryLevel = batteryLevel.toInt()
+                                )
+                            }
                             
-                            viewModel.addSensor(newSensor)
+                            if (isEditMode) {
+                                viewModel.updateSensor(sensorToSave) { onBack() }
+                            } else {
+                                viewModel.addSensor(sensorToSave) { onBack() }
+                            }
                             
                             showSuccessAnimation = true
                             scope.launch {
@@ -319,6 +359,7 @@ private fun CustomTextField(
     placeholder: String,
     suffix: String = "",
     isError: Boolean = false,
+    enabled: Boolean = true,
     keyboardType: KeyboardType = KeyboardType.Text
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -339,7 +380,7 @@ private fun CustomTextField(
                     color = if (isError) NoorRed else MaterialTheme.colorScheme.outline,
                     shape = RoundedCornerShape(12.dp)
                 )
-                .background(MaterialTheme.colorScheme.surface)
+                .background(if (enabled) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                 .padding(horizontal = 16.dp),
             contentAlignment = Alignment.CenterStart
         ) {
@@ -351,9 +392,10 @@ private fun CustomTextField(
                     value = value,
                     onValueChange = onValueChange,
                     modifier = Modifier.weight(1f),
+                    enabled = enabled,
                     textStyle = TextStyle(
                         fontSize = 16.sp,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
                     ),
                     keyboardOptions = KeyboardOptions(
                         keyboardType = keyboardType,
@@ -435,6 +477,7 @@ private fun SensorTypeSelector(
 @Composable
 private fun StreetlightDropdown(
     selectedStreetlight: String,
+    streetlights: List<Streetlight>,
     onStreetlightSelected: (String) -> Unit,
     isError: Boolean
 ) {
@@ -493,16 +536,17 @@ private fun StreetlightDropdown(
             onDismissRequest = { expanded = false },
             modifier = Modifier.fillMaxWidth(0.9f)
         ) {
-            mockStreetlights.forEach { streetlight ->
+            streetlights.forEach { streetlight ->
+                val display = "${streetlight.id} - ${streetlight.address}"
                 DropdownMenuItem(
                     text = {
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             Icon(Icons.Default.Lightbulb, null, tint = NoorAmber, modifier = Modifier.size(20.dp))
-                            Text(streetlight)
+                            Text(display)
                         }
                     },
                     onClick = {
-                        onStreetlightSelected(streetlight)
+                        onStreetlightSelected(display)
                         expanded = false
                     }
                 )
@@ -630,6 +674,7 @@ private fun StatusChips(
 
 @Composable
 private fun ActionButtons(
+    isEditMode: Boolean,
     onCancel: () -> Unit,
     onAdd: () -> Unit
 ) {
@@ -671,14 +716,14 @@ private fun ActionButtons(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    Icons.Default.Add,
+                    if (isEditMode) Icons.Default.Update else Icons.Default.Save,
                     null,
                     tint = Color.White,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    "Ajouter",
+                    if (isEditMode) "Mettre à jour" else "Enregistrer",
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = Color.White
@@ -713,12 +758,12 @@ private fun SuccessAnimation() {
                     modifier = Modifier.size(72.dp)
                 )
                 Text(
-                    "Capteur ajouté !",
+                    "C'est prêt !",
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    "Le capteur a été créé avec succès",
+                    "Les modifications ont été enregistrées avec succès.",
                     fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
